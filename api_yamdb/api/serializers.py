@@ -1,13 +1,10 @@
 from django.utils import timezone
 from rest_framework import serializers
-from rest_framework.relations import SlugRelatedField
 
 from reviews.models import (
     User,
     Category,
-    Comment,
     Genre,
-    Review,
     Title,
 )
 
@@ -109,3 +106,28 @@ class TitleViewSerializer(serializers.ModelSerializer):
             'genre',
             'category',
         )
+
+
+class SignUpSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = (
+            'username',
+            'email',
+        )
+
+    def validate_username(self, username):
+        if username == 'me':
+            raise serializers.ValidationError('Username can not equal "me"!')
+        return username
+
+    def validate_email(self, email):
+        mail = email.split('@')
+        if len(mail) != 2:
+            raise serializers.ValidationError('Email must have "@"!')
+        return email
+
+
+class ConfirmationSerializer(serializers.Serializer):
+    username = serializers.CharField()
+    confirmation_code = serializers.CharField()

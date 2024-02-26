@@ -97,3 +97,13 @@ class User(AbstractUser):
     @property
     def is_admin(self):
         return self.role == 'admin'
+
+
+class Comment(models.Model):
+    class Meta:
+        abstract = True
+
+
+class Review(models.Model):
+    class Meta:
+        abstract = True
