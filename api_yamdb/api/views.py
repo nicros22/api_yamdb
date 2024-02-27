@@ -1,11 +1,17 @@
+from sys import stderr
+import secrets
 from django.shortcuts import get_object_or_404
-from rest_framework import filters, mixins, status, viewsets
+from django.core.mail import send_mail
+from rest_framework import status, viewsets, decorators
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.filters import SearchFilter
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.pagination import PageNumberPagination
+from rest_framework_simplejwt import tokens
+from loguru import logger
+from django.contrib.auth.hashers import check_password
 
 from .mixins import ReviewsModelMixin
 from .serializers import (UserSerializer,
@@ -14,10 +20,18 @@ from .serializers import (UserSerializer,
                           CategorySerializer,
                           TitleSerializer,
                           TitleViewSerializer,
+                          SignUpSerializer,
+                          ConfirmationSerializer,
                           CommentSerializer,
                           ReviewSerializer)
+
 from reviews.models import Category, Genre, Title, User
 from .filters import TitleFilter
+
+logger.add(stderr, format='<white>{time:HH:mm:ss}</white>'
+                          ' | <level>{level: <8}</level>'
+                          ' | <cyan>{line}</cyan>'
+                          ' - <white>{message}</white>')
 
 
 
@@ -64,7 +78,7 @@ class CategoriesViewSet(ReviewsModelMixin):
 class TitlesViewSet(viewsets.ModelViewSet):
     queryset = Title.objects.all()
     serializer_class = TitleSerializer
-    #permission_classes = (IsAdminOrReadOnly,)
+    # permission_classes = (IsAdminOrReadOnly,)
     filter_backends = (DjangoFilterBackend,)
     filterset_class = TitleFilter
     pagination_class = PageNumberPagination
@@ -106,6 +120,89 @@ class CommentViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         return self.get_review().comments.all()
+
+
+def send_confirmation_email(email, confirmation_code):
+    subject = 'Confirmation Code for YourApp'
+    message = f'Your confirmation code is: {confirmation_code}'
+    from_email = 'yamdb@yamdb.com'
+    recipient_list = [email]
+
+    send_mail(subject, message, from_email, recipient_list)
+
+
+@decorators.api_view(['POST'])
+def signup(request):
+    serializer = SignUpSerializer(data=request.data)
+    existing_user = User.objects.filter(
+        username=request.data['username']
+    ).first()
+    existing_mail = User.objects.filter(
+        email=request.data['email']
+    ).first()
+    if existing_user or existing_mail:
+        email = request.data['email']
+        confirmation_code = secrets.token_hex(6)
+        if not existing_user:
+            return Response(
+                {'email': [email,]},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        if not existing_mail:
+            return Response(
+                {'username': [existing_user.username,]},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        if email == existing_user.email:
+            existing_user.set_password(confirmation_code)
+            existing_user.save()
+            send_confirmation_email(existing_user.email, confirmation_code)
+            return Response({
+                'email': existing_user.email,
+                'username': existing_user.username
+            }, status=status.HTTP_200_OK)
+        else:
+            return Response(
+                {'email': [email,],
+                 'username': [existing_user.username,]},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+    if serializer.is_valid():
+        confirmation_code = secrets.token_hex(6)
+        username = serializer.validated_data.get('username')
+        email = serializer.validated_data.get('email')
+
+        user = User.objects.create(username=username, email=email)
+        user.set_password(confirmation_code)
+        user.save()
+
+        send_confirmation_email(user.email, confirmation_code)
+
+        return Response(serializer.validated_data, status=status.HTTP_200_OK)
+
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@decorators.api_view(['POST'])
+def get_token(request):
+    serializer = ConfirmationSerializer(data=request.data)
+    if serializer.is_valid():
+        username = serializer.validated_data['username']
+        confirmation_code = serializer.validated_data['confirmation_code']
+        user = User.objects.get(username=username)
+
+        if check_password(confirmation_code, user.password):
+            refresh = tokens.RefreshToken.for_user(user)
+            return Response(
+                {'token': f'{refresh.access_token}'},
+                status=status.HTTP_200_OK
+            )
+
+    return Response(
+        {'message': 'Invalid confirmation code'},
+        status=status.HTTP_400_BAD_REQUEST
+    )
 
     def perform_create(self, serializer):
         review = self.get_review()
