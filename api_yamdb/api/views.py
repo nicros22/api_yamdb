@@ -18,6 +18,7 @@ from reviews.models import Category, Genre, Title, User
 from .filters import TitleFilter
 
 
+
 class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
