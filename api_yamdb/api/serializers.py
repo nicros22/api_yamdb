@@ -9,6 +9,8 @@ from reviews.models import (
     Genre,
     Review,
     Title,
+    Comment,
+    Review
 )
 
 
@@ -109,3 +111,22 @@ class TitleViewSerializer(serializers.ModelSerializer):
             'genre',
             'category',
         )
+      
+      
+class CommentSerializer(serializers.ModelSerializer):
+    author = serializers.SlugRelatedField(
+        read_only=True, slug_field='username')
+    review = serializers.PrimaryKeyRelatedField(
+        read_only=True)
+
+    class Meta:
+        fields = '__all__'
+        model = Comment
+
+
+class ReviewSerializer(serializers.ModelSerializer):
+    comments = CommentSerializer(many=True, read_only=True)
+
+    class Meta:
+        fields = '__all__'
+        model = Review
