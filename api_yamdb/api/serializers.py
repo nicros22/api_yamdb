@@ -6,6 +6,8 @@ from reviews.models import (
     Category,
     Genre,
     Title,
+    Comment,
+    Review
 )
 
 
@@ -131,3 +133,22 @@ class SignUpSerializer(serializers.ModelSerializer):
 class ConfirmationSerializer(serializers.Serializer):
     username = serializers.CharField()
     confirmation_code = serializers.CharField()
+      
+      
+class CommentSerializer(serializers.ModelSerializer):
+    author = serializers.SlugRelatedField(
+        read_only=True, slug_field='username')
+    review = serializers.PrimaryKeyRelatedField(
+        read_only=True)
+
+    class Meta:
+        fields = '__all__'
+        model = Comment
+
+
+class ReviewSerializer(serializers.ModelSerializer):
+    comments = CommentSerializer(many=True, read_only=True)
+
+    class Meta:
+        fields = '__all__'
+        model = Review

@@ -21,7 +21,10 @@ from .serializers import (UserSerializer,
                           TitleSerializer,
                           TitleViewSerializer,
                           SignUpSerializer,
-                          ConfirmationSerializer)
+                          ConfirmationSerializer,
+                          CommentSerializer,
+                          ReviewSerializer)
+
 from reviews.models import Category, Genre, Title, User
 from .filters import TitleFilter
 
@@ -29,6 +32,7 @@ logger.add(stderr, format='<white>{time:HH:mm:ss}</white>'
                           ' | <level>{level: <8}</level>'
                           ' | <cyan>{line}</cyan>'
                           ' - <white>{message}</white>')
+
 
 
 class UserViewSet(viewsets.ModelViewSet):
@@ -83,6 +87,39 @@ class TitlesViewSet(viewsets.ModelViewSet):
         if self.request.method in ('POST', 'PATCH',):
             return TitleViewSerializer
         return TitleSerializer
+      
+      
+class ReviewViewSet(viewsets.ModelViewSet):
+    serializer_class = ReviewSerializer
+
+    def get_title(self):
+        title_id = self.kwargs['title_id']
+        return get_object_or_404(Title, id=title_id)
+
+    def get_queryset(self):
+        return self.get_title().reviews.all()
+
+    def perform_create(self, serializer):
+        title = self.get_title()
+        serializer.save(user=self.request.user, title=title)
+        review = serializer.instance
+        review.title.average_rating()
+
+    def perform_update(self, serializer):
+        review = serializer.save()
+        review.title.average_rating()
+
+
+class CommentViewSet(viewsets.ModelViewSet):
+    serializer_class = CommentSerializer
+
+    def get_review(self):
+        title_id = self.kwargs['title_id']
+        review_id = self.kwargs['review_id']
+        return get_object_or_404(Review, id=review_id, title__id=title_id)
+
+    def get_queryset(self):
+        return self.get_review().comments.all()
 
 
 def send_confirmation_email(email, confirmation_code):
@@ -166,3 +203,7 @@ def get_token(request):
         {'message': 'Invalid confirmation code'},
         status=status.HTTP_400_BAD_REQUEST
     )
+
+    def perform_create(self, serializer):
+        review = self.get_review()
+        serializer.save(author=self.request.user, review=review)
