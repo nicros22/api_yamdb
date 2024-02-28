@@ -84,8 +84,8 @@ class TitleSerializer(serializers.ModelSerializer):
 
 
 class TitleViewSerializer(serializers.ModelSerializer):
-    category = CategorySerializer()
-    genre = GenreSerializer()
+    category = CategorySerializer(many=False, required=True)
+    genre = GenreSerializer(many=True, required=False)
     rating = serializers.IntegerField()
 
     class Meta:
@@ -142,7 +142,7 @@ class CommentSerializer(serializers.ModelSerializer):
         read_only=True)
 
     class Meta:
-        fields = '__all__'
+        fields = ('id', 'review', 'text', 'author', 'pub_date')
         model = Comment
 
 
@@ -150,5 +150,5 @@ class ReviewSerializer(serializers.ModelSerializer):
     comments = CommentSerializer(many=True, read_only=True)
 
     class Meta:
-        fields = '__all__'
+        fields = ('id', 'title', 'text', 'author', 'score', 'pub_date', 'comments')
         model = Review

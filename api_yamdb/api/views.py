@@ -12,6 +12,7 @@ from rest_framework.pagination import PageNumberPagination
 from rest_framework_simplejwt import tokens
 from loguru import logger
 from django.contrib.auth.hashers import check_password
+from rest_framework.exceptions import MethodNotAllowed
 
 from .mixins import ReviewsModelMixin
 from .serializers import (UserSerializer,
@@ -86,7 +87,7 @@ class TitlesViewSet(viewsets.ModelViewSet):
     pagination_class = PageNumberPagination
 
     def get_serializer_class(self):
-        if self.request.method in ('POST', 'PATCH',):
+        if self.request.method in ('list', 'retrieve',):
             return TitleViewSerializer
         return TitleSerializer
 
@@ -96,7 +97,7 @@ class ReviewViewSet(viewsets.ModelViewSet):
     permission_classes = (IsOwnerOrModeratorOrReadOnly, )
 
     def get_title(self):
-        title_id = self.kwargs['title_id']
+        title_id = self.kwargs.get('title_id')
         return get_object_or_404(Title, id=title_id)
 
     def get_queryset(self):
@@ -115,7 +116,7 @@ class ReviewViewSet(viewsets.ModelViewSet):
 
 class CommentViewSet(viewsets.ModelViewSet):
     serializer_class = CommentSerializer
-    permission_classes = (AuthorOrAdmin, )
+    permission_classes = (IsOwnerOrModeratorOrReadOnly, )
 
     def get_review(self):
         title_id = self.kwargs['title_id']
