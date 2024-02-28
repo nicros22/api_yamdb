@@ -1,6 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
-from django.core.validators import MaxValueValidator, MinValueValidator
+from django.core.validators import MaxValueValidator, MinValueValidator, MaxLengthValidator
 from django.utils import timezone
 
 from .constants import MAX_LENGTH_MODEL
@@ -72,7 +72,10 @@ class GenreTitle(models.Model):
 
 class User(AbstractUser):
     """Базовая модель пользователей"""
-    email = models.EmailField(unique=True, verbose_name='Email')
+    email = models.EmailField(unique=True,
+                              verbose_name='Email',
+                              max_length=MAX_LENGTH_MODEL,
+                              validators=[MaxLengthValidator(253)])
     bio = models.TextField(blank=True, verbose_name='О себе')
     role = models.CharField(max_length=MAX_LENGTH_MODEL,
                             choices=ROLE_CHOICES,

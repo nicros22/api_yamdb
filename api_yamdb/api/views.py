@@ -25,7 +25,10 @@ from .serializers import (UserSerializer,
                           CommentSerializer,
                           ReviewSerializer)
 
-from reviews.models import Category, Genre, Title, User
+from reviews.models import Category, Genre, Title, User, Review, Comment
+from .permissions import (IsAdminOrReadOnly,
+                          IsOwnerOrModeratorOrReadOnly,
+                          AuthorOrAdmin)
 from .filters import TitleFilter
 
 logger.add(stderr, format='<white>{time:HH:mm:ss}</white>'
@@ -34,11 +37,10 @@ logger.add(stderr, format='<white>{time:HH:mm:ss}</white>'
                           ' - <white>{message}</white>')
 
 
-
 class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
-    permission_classes = (IsAuthenticated,)
+    permission_classes = (AuthorOrAdmin,)
     lookup_field = 'username'
     lookup_value_regex = r'[\w\@\.\+\-]+'
     filter_backends = (SearchFilter, )
@@ -56,7 +58,7 @@ class UserViewSet(viewsets.ModelViewSet):
         if request.method == 'GET':
             serializer = MeSerializer(user)
             return Response(serializer.data, status=status.HTTP_200_OK)
-        elif request.method == 'PATCH':
+        if request.method == 'PATCH':
             serializer = MeSerializer(
                 user, data=request.data, partial=True
             )
@@ -78,7 +80,7 @@ class CategoriesViewSet(ReviewsModelMixin):
 class TitlesViewSet(viewsets.ModelViewSet):
     queryset = Title.objects.all()
     serializer_class = TitleSerializer
-    # permission_classes = (IsAdminOrReadOnly,)
+    permission_classes = (IsAdminOrReadOnly,)
     filter_backends = (DjangoFilterBackend,)
     filterset_class = TitleFilter
     pagination_class = PageNumberPagination
@@ -91,6 +93,7 @@ class TitlesViewSet(viewsets.ModelViewSet):
       
 class ReviewViewSet(viewsets.ModelViewSet):
     serializer_class = ReviewSerializer
+    permission_classes = (IsOwnerOrModeratorOrReadOnly, )
 
     def get_title(self):
         title_id = self.kwargs['title_id']
@@ -112,6 +115,7 @@ class ReviewViewSet(viewsets.ModelViewSet):
 
 class CommentViewSet(viewsets.ModelViewSet):
     serializer_class = CommentSerializer
+    permission_classes = (AuthorOrAdmin, )
 
     def get_review(self):
         title_id = self.kwargs['title_id']
@@ -120,6 +124,10 @@ class CommentViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         return self.get_review().comments.all()
+
+    def perform_create(self, serializer):
+        review = self.get_review()
+        serializer.save(author=self.request.user, review=review)
 
 
 def send_confirmation_email(email, confirmation_code):
@@ -203,7 +211,3 @@ def get_token(request):
         {'message': 'Invalid confirmation code'},
         status=status.HTTP_400_BAD_REQUEST
     )
-
-    def perform_create(self, serializer):
-        review = self.get_review()
-        serializer.save(author=self.request.user, review=review)

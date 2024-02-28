@@ -1,6 +1,8 @@
 from rest_framework import filters, mixins, viewsets
 from rest_framework.permissions import IsAuthenticatedOrReadOnly, IsAuthenticated
 
+from .permissions import IsAdminOrReadOnly
+
 class ReviewsModelMixin(
     mixins.CreateModelMixin,
     mixins.ListModelMixin,
@@ -9,7 +11,7 @@ class ReviewsModelMixin(
 ):
     permission_classes = [
         IsAuthenticatedOrReadOnly,
-     #   IsAdminOrReadOnly
+        IsAdminOrReadOnly
     ]
     filter_backends = (filters.SearchFilter,)
     search_fields = ('name', 'slug')
