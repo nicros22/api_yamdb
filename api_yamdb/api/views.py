@@ -143,13 +143,13 @@ def send_confirmation_email(email, confirmation_code):
 def signup(request):
     serializer = SignUpSerializer(data=request.data)
     existing_user = User.objects.filter(
-        username=request.data['username']
+        username=request.data.get('username')
     ).first()
     existing_mail = User.objects.filter(
-        email=request.data['email']
+        email=request.data.get('email')
     ).first()
     if existing_user or existing_mail:
-        email = request.data['email']
+        email = request.data.get('email')
         confirmation_code = secrets.token_hex(6)
         if not existing_user:
             return Response(
