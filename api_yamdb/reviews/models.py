@@ -3,7 +3,7 @@ from django.contrib.auth.models import AbstractUser
 from django.core.validators import MaxValueValidator, MinValueValidator
 from django.utils import timezone
 
-from .constants import MAX_LENGTH_MODEL
+from .constants import MAX_LENGTH_MODEL, MAX_LENGTH_SLUG
 
 ROLE_CHOICES = (
     ('user', 'Пользователь'),
@@ -15,7 +15,7 @@ ROLE_CHOICES = (
 class Category(models.Model):
     """Базовая модель категорий"""
     name = models.CharField(max_length=MAX_LENGTH_MODEL)
-    slug = models.SlugField(max_length=MAX_LENGTH_MODEL, unique=True)
+    slug = models.SlugField(max_length=MAX_LENGTH_SLUG, unique=True)
 
     def __str__(self):
         return self.slug
@@ -24,7 +24,7 @@ class Category(models.Model):
 class Genre(models.Model):
     "Базовая модель жанров"
     name = models.CharField(max_length=MAX_LENGTH_MODEL)
-    slug = models.SlugField(max_length=MAX_LENGTH_MODEL, unique=True)
+    slug = models.SlugField(max_length=MAX_LENGTH_SLUG, unique=True)
 
     def __str__(self):
         return self.slug
@@ -52,6 +52,13 @@ class Title(models.Model):
         null=True,
         verbose_name='Описание'
     )
+    rating = models.FloatField(default=0)
+
+    def average_rating(self):
+        avg_score = self.reviews.aggregate(avg_score=models.Avg('score'))['avg_score']
+        if avg_score is not None:
+            self.rating = avg_score
+            self.save()
 
     class Meta:
         verbose_name = 'Произведение'
@@ -110,11 +117,6 @@ class Review(models.Model):
     score = models.IntegerField(
         validators=[MinValueValidator(1), MaxValueValidator(10)], default=0)
     pub_date = models.DateTimeField(auto_now_add=True)
-
-    def average_rating(self):
-        self.rating = self.reviews.aggregate(
-            avg_score=models.Avg('score'))['avg_score']
-        self.save()
 
     class Meta:
         unique_together = ['author', 'title']

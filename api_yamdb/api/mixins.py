@@ -3,6 +3,7 @@ from rest_framework.permissions import IsAuthenticatedOrReadOnly, IsAuthenticate
 
 from .permissions import IsAdminOrReadOnly
 
+
 class ReviewsModelMixin(
     mixins.CreateModelMixin,
     mixins.ListModelMixin,
