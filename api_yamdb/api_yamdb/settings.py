@@ -1,5 +1,5 @@
 from pathlib import Path
-
+from datetime import timedelta
 from django.core.management.utils import get_random_secret_key
 
 
@@ -24,9 +24,10 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
+    'rest_framework_simplejwt',
     'django_filters',
-    'api.apps.ApiConfig',
-    'reviews.apps.ReviewsConfig'
+    'api',
+    'reviews'
 ]
 
 MIDDLEWARE = [
@@ -95,7 +96,16 @@ EMAIL_FILE_PATH = (BASE_DIR / 'mail/')
 
 REST_FRAMEWORK = {
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
-    'PAGE_SIZE': 10
+    'PAGE_SIZE': 10,
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticatedOrReadOnly',
+    ],
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ],
+    'DEFAULT_FILTER_BACKENDS': [
+        'django_filters.rest_framework.DjangoFilterBackend',
+    ],
 }
 
 # Internationalization
@@ -110,8 +120,11 @@ USE_L10N = True
 
 USE_TZ = True
 
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(days=1),
+    'AUTH_HEADER_TYPES': ('Bearer',),
+}
 
-# Static files (CSS, JavaScript, Images)
 
 STATIC_URL = '/static/'
 

@@ -40,18 +40,18 @@ logger.add(stderr, format='<white>{time:HH:mm:ss}</white>'
 class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all()
     serializer_class = UserSerializer
+    pagination_class = PageNumberPagination
     permission_classes = (AuthorOrAdmin,)
     lookup_field = 'username'
-    lookup_value_regex = r'[\w\@\.\+\-]+'
     filter_backends = (SearchFilter, )
+    filterset_fields = ('username', )
     search_fields = ('username', )
 
     @action(
         detail=False,
         methods=['get', 'patch'],
-        permission_classes=[IsAuthenticated],
+        permission_classes=(IsAuthenticated, ),
         url_path='me',
-        url_name='me',
     )
     def about_me(self, request):
         user = get_object_or_404(User, username=self.request.user)
