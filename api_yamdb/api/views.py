@@ -1,5 +1,6 @@
 from sys import stderr
 import secrets
+from django.db.models import Avg
 from django.core.mail import send_mail
 from rest_framework import status, viewsets
 from rest_framework.generics import get_object_or_404
@@ -43,10 +44,13 @@ class UserViewSet(viewsets.ModelViewSet):
     serializer_class = UserSerializer
     pagination_class = PageNumberPagination
     permission_classes = (AuthorOrAdmin,)
+    filter_backends = (SearchFilter,)
     lookup_field = 'username'
-    filter_backends = (SearchFilter, )
-    filterset_fields = ('username', )
+    filterset_fields = ('username')
     search_fields = ('username', )
+
+    def update(self, request, *args, **kwargs):
+        raise MethodNotAllowed('PUT')
 
     @action(
         detail=False,
@@ -79,12 +83,15 @@ class CategoriesViewSet(ReviewsModelMixin):
 
 
 class TitlesViewSet(viewsets.ModelViewSet):
-    queryset = Title.objects.all()
+    queryset = Title.objects.annotate(rating=Avg('reviews__score'))
     serializer_class = TitleSerializer
     permission_classes = (IsAdminOrReadOnly,)
     filter_backends = (DjangoFilterBackend,)
     filterset_class = TitleFilter
     pagination_class = PageNumberPagination
+
+    def update(self, request, *args, **kwargs):
+        raise MethodNotAllowed('PUT')
 
     def get_serializer_class(self):
         if self.request.method in ('list', 'retrieve',):
@@ -94,40 +101,37 @@ class TitlesViewSet(viewsets.ModelViewSet):
 
 class ReviewViewSet(viewsets.ModelViewSet):
     serializer_class = ReviewSerializer
-    permission_classes = (IsOwnerOrModeratorOrReadOnly, )
-
-    def get_title(self):
-        title_id = self.kwargs.get('title_id')
-        return get_object_or_404(Title, id=title_id)
+    permission_classes = [IsOwnerOrModeratorOrReadOnly]
 
     def get_queryset(self):
-        return self.get_title().reviews.all()
+        title = get_object_or_404(Title, id=self.kwargs.get('title_id'))
+        new_queryset = title.reviews.all()
+        return new_queryset
 
     def perform_create(self, serializer):
-        title = self.get_title()
-        serializer.save(user=self.request.user, title=title)
-        review = serializer.instance
-        review.title.average_rating()
-
-    def perform_update(self, serializer):
-        review = serializer.save()
-        review.title.average_rating()
+        title = get_object_or_404(Title, id=self.kwargs.get('title_id'))
+        serializer.save(author=self.request.user, title=title)
 
 
 class CommentViewSet(viewsets.ModelViewSet):
     serializer_class = CommentSerializer
-    permission_classes = (IsOwnerOrModeratorOrReadOnly, )
-
-    def get_review(self):
-        title_id = self.kwargs['title_id']
-        review_id = self.kwargs['review_id']
-        return get_object_or_404(Review, id=review_id, title__id=title_id)
+    permission_classes = [IsOwnerOrModeratorOrReadOnly]
 
     def get_queryset(self):
-        return self.get_review().comments.all()
+        title = get_object_or_404(Title, id=self.kwargs.get('title_id'))
+        try:
+            review = title.reviews.get(id=self.kwargs.get('review_id'))
+        except TypeError:
+            TypeError('У произведения нет такого отзыва')
+        queryset = review.comments.all()
+        return queryset
 
     def perform_create(self, serializer):
-        review = self.get_review()
+        title = get_object_or_404(Title, id=self.kwargs.get('title_id'))
+        try:
+            review = title.reviews.get(id=self.kwargs.get('review_id'))
+        except TypeError:
+            TypeError('У произведения нет такого отзыва')
         serializer.save(author=self.request.user, review=review)
 
 
