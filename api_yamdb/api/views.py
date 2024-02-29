@@ -27,11 +27,13 @@ from .serializers import (UserSerializer,
                           CommentSerializer,
                           ReviewSerializer)
 
-from reviews.models import Category, Genre, Title, User, Review
+from reviews.models import Category, Genre, Title, User
 from .permissions import (IsAdminOrReadOnly,
                           IsOwnerOrModeratorOrReadOnly,
                           AuthorOrAdmin)
 from .filters import TitleFilter
+
+from django.core.exceptions import ValidationError
 
 logger.add(stderr, format='<white>{time:HH:mm:ss}</white>'
                           ' | <level>{level: <8}</level>'
@@ -71,6 +73,13 @@ class UserViewSet(viewsets.ModelViewSet):
             serializer.save()
             return Response(serializer.data, status=status.HTTP_200_OK)
 
+    def partial_update(self, request, *args, **kwargs):
+        user = self.get_object()
+        serializer = self.get_serializer(user, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
 
 class GenresViewSet(ReviewsModelMixin):
     queryset = Genre.objects.all()
@@ -91,12 +100,35 @@ class TitlesViewSet(viewsets.ModelViewSet):
     pagination_class = PageNumberPagination
 
     def update(self, request, *args, **kwargs):
-        raise MethodNotAllowed('PUT')
+        raise MethodNotAllowed(request.method)
 
     def get_serializer_class(self):
-        if self.request.method in ('list', 'retrieve',):
+        if self.action in ('list', 'retrieve',):
             return TitleViewSerializer
         return TitleSerializer
+
+    def partial_update(self, request, *args, **kwargs):
+        name = request.data.get('name')
+        if name and len(name) > 256:
+            raise ValidationError(
+                'Название произведения не может быть длиннее 256 символов.')
+        instance = self.get_object()
+        serializer = self.get_serializer(
+            instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
+
+    def handle_exception(self, exc):
+        if isinstance(exc, MethodNotAllowed):
+            return Response(
+                {'detail': 'Метод не разрешен'},
+                status=status.HTTP_405_METHOD_NOT_ALLOWED)
+        if isinstance(exc, ValidationError):
+            return Response(
+                {'detail': str(exc)},
+                status=status.HTTP_400_BAD_REQUEST)
+        return super().handle_exception(exc)
 
 
 class ReviewViewSet(viewsets.ModelViewSet):
@@ -111,6 +143,19 @@ class ReviewViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         title = get_object_or_404(Title, id=self.kwargs.get('title_id'))
         serializer.save(author=self.request.user, title=title)
+
+    def update(self, request, *args, **kwargs):
+        return Response(
+            {'detail': 'Метод не разрешен'},
+            status=status.HTTP_405_METHOD_NOT_ALLOWED)
+
+    def partial_update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(
+            instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
 
 
 class CommentViewSet(viewsets.ModelViewSet):
@@ -133,6 +178,19 @@ class CommentViewSet(viewsets.ModelViewSet):
         except TypeError:
             TypeError('У произведения нет такого отзыва')
         serializer.save(author=self.request.user, review=review)
+
+    def update(self, request, *args, **kwargs):
+        return Response(
+            {'detail': 'Метод не разрешен'},
+            status=status.HTTP_405_METHOD_NOT_ALLOWED)
+
+    def partial_update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(
+            instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
 
 
 class AuthenticationViewset(viewsets.GenericViewSet):
