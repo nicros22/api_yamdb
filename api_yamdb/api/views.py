@@ -207,12 +207,12 @@ class AuthenticationViewset(viewsets.GenericViewSet):
             confirmation_code = secrets.token_hex(6)
             if not existing_user:
                 return Response(
-                    {'email': [email,]},
+                    {'email': [email, ]},
                     status=status.HTTP_400_BAD_REQUEST
                 )
             if not existing_mail:
                 return Response(
-                    {'username': [existing_user.username,]},
+                    {'username': [existing_user.username, ]},
                     status=status.HTTP_400_BAD_REQUEST
                 )
             if email == existing_user.email:
@@ -228,8 +228,8 @@ class AuthenticationViewset(viewsets.GenericViewSet):
                 }, status=status.HTTP_200_OK)
             else:
                 return Response(
-                    {'email': [email,],
-                     'username': [existing_user.username,]},
+                    {'email': [email, ],
+                     'username': [existing_user.username, ]},
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
