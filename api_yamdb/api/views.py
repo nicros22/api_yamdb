@@ -1,5 +1,6 @@
 from sys import stderr
 import secrets
+from django.db.models import Avg
 from django.core.mail import send_mail
 from rest_framework import status, viewsets
 from rest_framework.generics import get_object_or_404
@@ -26,11 +27,13 @@ from .serializers import (UserSerializer,
                           CommentSerializer,
                           ReviewSerializer)
 
-from reviews.models import Category, Genre, Title, User, Review
+from reviews.models import Category, Genre, Title, User
 from .permissions import (IsAdminOrReadOnly,
                           IsOwnerOrModeratorOrReadOnly,
                           AuthorOrAdmin)
 from .filters import TitleFilter
+
+from django.core.exceptions import ValidationError
 
 logger.add(stderr, format='<white>{time:HH:mm:ss}</white>'
                           ' | <level>{level: <8}</level>'
@@ -43,10 +46,13 @@ class UserViewSet(viewsets.ModelViewSet):
     serializer_class = UserSerializer
     pagination_class = PageNumberPagination
     permission_classes = (AuthorOrAdmin,)
+    filter_backends = (SearchFilter,)
     lookup_field = 'username'
-    filter_backends = (SearchFilter, )
-    filterset_fields = ('username', )
+    filterset_fields = ('username')
     search_fields = ('username', )
+
+    def update(self, request, *args, **kwargs):
+        raise MethodNotAllowed('PUT')
 
     @action(
         detail=False,
@@ -67,6 +73,13 @@ class UserViewSet(viewsets.ModelViewSet):
             serializer.save()
             return Response(serializer.data, status=status.HTTP_200_OK)
 
+    def partial_update(self, request, *args, **kwargs):
+        user = self.get_object()
+        serializer = self.get_serializer(user, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
 
 class GenresViewSet(ReviewsModelMixin):
     queryset = Genre.objects.all()
@@ -79,56 +92,105 @@ class CategoriesViewSet(ReviewsModelMixin):
 
 
 class TitlesViewSet(viewsets.ModelViewSet):
-    queryset = Title.objects.all()
+    queryset = Title.objects.annotate(rating=Avg('reviews__score'))
     serializer_class = TitleSerializer
     permission_classes = (IsAdminOrReadOnly,)
     filter_backends = (DjangoFilterBackend,)
     filterset_class = TitleFilter
     pagination_class = PageNumberPagination
 
+    def update(self, request, *args, **kwargs):
+        raise MethodNotAllowed(request.method)
+
     def get_serializer_class(self):
-        if self.request.method in ('list', 'retrieve',):
+        if self.action in ('list', 'retrieve',):
             return TitleViewSerializer
         return TitleSerializer
+
+    def partial_update(self, request, *args, **kwargs):
+        name = request.data.get('name')
+        if name and len(name) > 256:
+            raise ValidationError(
+                'Название произведения не может быть длиннее 256 символов.')
+        instance = self.get_object()
+        serializer = self.get_serializer(
+            instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
+
+    def handle_exception(self, exc):
+        if isinstance(exc, MethodNotAllowed):
+            return Response(
+                {'detail': 'Метод не разрешен'},
+                status=status.HTTP_405_METHOD_NOT_ALLOWED)
+        if isinstance(exc, ValidationError):
+            return Response(
+                {'detail': str(exc)},
+                status=status.HTTP_400_BAD_REQUEST)
+        return super().handle_exception(exc)
 
 
 class ReviewViewSet(viewsets.ModelViewSet):
     serializer_class = ReviewSerializer
-    permission_classes = (IsOwnerOrModeratorOrReadOnly, )
-
-    def get_title(self):
-        title_id = self.kwargs.get('title_id')
-        return get_object_or_404(Title, id=title_id)
+    permission_classes = [IsOwnerOrModeratorOrReadOnly]
 
     def get_queryset(self):
-        return self.get_title().reviews.all()
+        title = get_object_or_404(Title, id=self.kwargs.get('title_id'))
+        new_queryset = title.reviews.all()
+        return new_queryset
 
     def perform_create(self, serializer):
-        title = self.get_title()
-        serializer.save(user=self.request.user, title=title)
-        review = serializer.instance
-        review.title.average_rating()
+        title = get_object_or_404(Title, id=self.kwargs.get('title_id'))
+        serializer.save(author=self.request.user, title=title)
 
-    def perform_update(self, serializer):
-        review = serializer.save()
-        review.title.average_rating()
+    def update(self, request, *args, **kwargs):
+        return Response(
+            {'detail': 'Метод не разрешен'},
+            status=status.HTTP_405_METHOD_NOT_ALLOWED)
+
+    def partial_update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(
+            instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
 
 
 class CommentViewSet(viewsets.ModelViewSet):
     serializer_class = CommentSerializer
-    permission_classes = (IsOwnerOrModeratorOrReadOnly, )
-
-    def get_review(self):
-        title_id = self.kwargs['title_id']
-        review_id = self.kwargs['review_id']
-        return get_object_or_404(Review, id=review_id, title__id=title_id)
+    permission_classes = [IsOwnerOrModeratorOrReadOnly]
 
     def get_queryset(self):
-        return self.get_review().comments.all()
+        title = get_object_or_404(Title, id=self.kwargs.get('title_id'))
+        try:
+            review = title.reviews.get(id=self.kwargs.get('review_id'))
+        except TypeError:
+            TypeError('У произведения нет такого отзыва')
+        queryset = review.comments.all()
+        return queryset
 
     def perform_create(self, serializer):
-        review = self.get_review()
+        title = get_object_or_404(Title, id=self.kwargs.get('title_id'))
+        try:
+            review = title.reviews.get(id=self.kwargs.get('review_id'))
+        except TypeError:
+            TypeError('У произведения нет такого отзыва')
         serializer.save(author=self.request.user, review=review)
+
+    def update(self, request, *args, **kwargs):
+        return Response(
+            {'detail': 'Метод не разрешен'},
+            status=status.HTTP_405_METHOD_NOT_ALLOWED)
+
+    def partial_update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(
+            instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
 
 
 class AuthenticationViewset(viewsets.GenericViewSet):

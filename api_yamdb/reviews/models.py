@@ -52,13 +52,6 @@ class Title(models.Model):
         null=True,
         verbose_name='Описание'
     )
-    rating = models.FloatField(default=0)
-
-    def average_rating(self):
-        avg_score = self.reviews.aggregate(avg_score=models.Avg('score'))['avg_score']
-        if avg_score is not None:
-            self.rating = avg_score
-            self.save()
 
     class Meta:
         verbose_name = 'Произведение'
@@ -113,14 +106,17 @@ class Review(models.Model):
         Title, on_delete=models.CASCADE, related_name='reviews')
     text = models.TextField(max_length=256)
     author = models.ForeignKey(
-        User, on_delete=models.CASCADE)
+        User, on_delete=models.CASCADE, related_name='reviews')
     score = models.IntegerField(
         validators=[MinValueValidator(1), MaxValueValidator(10)], default=0)
     pub_date = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        unique_together = ['author', 'title']
-        verbose_name = 'Отзыв'
+        ordering = ['-pub_date']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['author', 'title'], name="unique_review")
+        ]
 
     def __str__(self):
         return self.title
@@ -131,8 +127,8 @@ class Comment(models.Model):
         Review, on_delete=models.CASCADE, related_name='comments')
     text = models.TextField(max_length=256)
     author = models.ForeignKey(
-        User, on_delete=models.CASCADE)
-    pub_date = models.DateTimeField(auto_now_add=True)
+        User, on_delete=models.CASCADE, related_name='comments')
+    pub_date = models.DateTimeField(auto_now_add=True, db_index=True)
 
     class Meta:
         verbose_name = 'Комментарий'

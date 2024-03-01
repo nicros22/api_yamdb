@@ -5,11 +5,11 @@ from django.core.management import BaseCommand
 from reviews.models import Category, Comment, Genre, GenreTitle, Review, Title, User
 
 DATA_NAMES = {
-    Category: 'categories.csv',
+    Category: 'category.csv',
     Comment: 'comments.csv',
-    Genre: 'genres.csv',
+    Genre: 'genre.csv',
     GenreTitle: 'genre_title.csv',
-    Review: 'reviews.csv',
+    Review: 'review.csv',
     Title: 'titles.csv',
     User: 'users.csv'
 }
