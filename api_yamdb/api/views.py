@@ -42,7 +42,7 @@ logger.add(stderr, format='<white>{time:HH:mm:ss}</white>'
 
 
 class UserViewSet(viewsets.ModelViewSet):
-    queryset = User.objects.all()
+    queryset = User.objects.all().order_by('pk')
     serializer_class = UserSerializer
     pagination_class = PageNumberPagination
     permission_classes = (AuthorOrAdmin,)
@@ -82,17 +82,18 @@ class UserViewSet(viewsets.ModelViewSet):
 
 
 class GenresViewSet(ReviewsModelMixin):
-    queryset = Genre.objects.all()
+    queryset = Genre.objects.all().order_by('pk')
     serializer_class = GenreSerializer
 
 
 class CategoriesViewSet(ReviewsModelMixin):
-    queryset = Category.objects.all()
+    queryset = Category.objects.all().order_by('pk')
     serializer_class = CategorySerializer
 
 
 class TitlesViewSet(viewsets.ModelViewSet):
-    queryset = Title.objects.annotate(rating=Avg('reviews__score'))
+    queryset = Title.objects.annotate(
+        rating=Avg('reviews__score')).order_by('pk')
     serializer_class = TitleSerializer
     permission_classes = (IsAdminOrReadOnly,)
     filter_backends = (DjangoFilterBackend,)
@@ -168,7 +169,7 @@ class CommentViewSet(viewsets.ModelViewSet):
             review = title.reviews.get(id=self.kwargs.get('review_id'))
         except TypeError:
             TypeError('У произведения нет такого отзыва')
-        queryset = review.comments.all()
+        queryset = review.comments.all().order_by('pk')
         return queryset
 
     def perform_create(self, serializer):

@@ -32,7 +32,9 @@ class Genre(models.Model):
 
 class Title(models.Model):
     """Базовая модель произведений"""
-    name = models.CharField(max_length=MAX_LENGTH_MODEL, verbose_name='Название')
+    name = models.CharField(
+        max_length=MAX_LENGTH_MODEL, verbose_name='Название'
+    )
     genre = models.ManyToManyField(Genre,
                                    related_name='genre',
                                    verbose_name='Жанр',
