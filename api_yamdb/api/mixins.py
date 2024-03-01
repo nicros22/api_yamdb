@@ -1,5 +1,5 @@
 from rest_framework import filters, mixins, viewsets
-from rest_framework.permissions import IsAuthenticatedOrReadOnly, IsAuthenticated
+from rest_framework.permissions import IsAuthenticatedOrReadOnly
 
 from .permissions import IsAdminOrReadOnly
 

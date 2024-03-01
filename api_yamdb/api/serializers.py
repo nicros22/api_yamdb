@@ -2,14 +2,7 @@ from django.db.models import Avg
 from django.utils import timezone
 from rest_framework import serializers
 
-from reviews.models import (
-    User,
-    Category,
-    Genre,
-    Title,
-    Comment,
-    Review
-)
+from reviews.models import Category, Comment, Genre, Review, Title, User
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -140,13 +133,11 @@ class SignUpSerializer(serializers.ModelSerializer):
 class ConfirmationSerializer(serializers.Serializer):
     username = serializers.CharField()
     confirmation_code = serializers.CharField()
-      
-      
+
+
 class CommentSerializer(serializers.ModelSerializer):
     author = serializers.SlugRelatedField(
         read_only=True, slug_field='username')
-    #review = serializers.PrimaryKeyRelatedField(
-    #    read_only=True)
 
     class Meta:
         fields = ('id', 'text', 'author', 'pub_date')
@@ -156,7 +147,7 @@ class CommentSerializer(serializers.ModelSerializer):
 class ReviewSerializer(serializers.ModelSerializer):
     author = serializers.SlugRelatedField(
         read_only=True, slug_field='username',
-    default=serializers.CurrentUserDefault())
+        default=serializers.CurrentUserDefault())
 
     class Meta:
         fields = '__all__'

@@ -1,44 +1,29 @@
-from sys import stderr
 import secrets
-from django.db.models import Avg
-from django.core.mail import send_mail
-from rest_framework import status, viewsets
-from rest_framework.generics import get_object_or_404
-from rest_framework.permissions import AllowAny, IsAuthenticated
-from rest_framework.filters import SearchFilter
-from rest_framework.response import Response
-from rest_framework.decorators import action
-from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework.pagination import PageNumberPagination
-from rest_framework_simplejwt import tokens
-from loguru import logger
+
 from django.contrib.auth.hashers import check_password
-from rest_framework.exceptions import MethodNotAllowed
-
-from .mixins import ReviewsModelMixin
-from .serializers import (UserSerializer,
-                          MeSerializer,
-                          GenreSerializer,
-                          CategorySerializer,
-                          TitleSerializer,
-                          TitleViewSerializer,
-                          SignUpSerializer,
-                          ConfirmationSerializer,
-                          CommentSerializer,
-                          ReviewSerializer)
-
-from reviews.models import Category, Genre, Title, User
-from .permissions import (IsAdminOrReadOnly,
-                          IsOwnerOrModeratorOrReadOnly,
-                          AuthorOrAdmin)
-from .filters import TitleFilter
-
 from django.core.exceptions import ValidationError
+from django.core.mail import send_mail
+from django.db.models import Avg
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework import status, viewsets
+from rest_framework.decorators import action
+from rest_framework.exceptions import MethodNotAllowed
+from rest_framework.filters import SearchFilter
+from rest_framework.generics import get_object_or_404
+from rest_framework.pagination import PageNumberPagination
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.response import Response
+from rest_framework_simplejwt import tokens
+from reviews.models import Category, Genre, Title, User
 
-logger.add(stderr, format='<white>{time:HH:mm:ss}</white>'
-                          ' | <level>{level: <8}</level>'
-                          ' | <cyan>{line}</cyan>'
-                          ' - <white>{message}</white>')
+from .filters import TitleFilter
+from .mixins import ReviewsModelMixin
+from .permissions import (AuthorOrAdmin, IsAdminOrReadOnly,
+                          IsOwnerOrModeratorOrReadOnly)
+from .serializers import (CategorySerializer, CommentSerializer,
+                          ConfirmationSerializer, GenreSerializer,
+                          MeSerializer, ReviewSerializer, SignUpSerializer,
+                          TitleSerializer, TitleViewSerializer, UserSerializer)
 
 
 class UserViewSet(viewsets.ModelViewSet):
