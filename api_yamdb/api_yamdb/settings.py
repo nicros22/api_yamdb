@@ -1,10 +1,12 @@
 from pathlib import Path
+from datetime import timedelta
+from django.core.management.utils import get_random_secret_key
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'p&l%385148kslhtyn^##a1)ilz@4zqj=rq&agdol^##zgl9(vs'
+SECRET_KEY = get_random_secret_key()
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -21,6 +23,11 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'rest_framework',
+    'rest_framework_simplejwt',
+    'django_filters',
+    'api',
+    'reviews'
 ]
 
 MIDDLEWARE = [
@@ -82,6 +89,24 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
+AUTH_USER_MODEL = 'reviews.User'
+
+EMAIL_BACKEND = 'django.core.mail.backends.filebased.EmailBackend'
+EMAIL_FILE_PATH = (BASE_DIR / 'mail/')
+
+REST_FRAMEWORK = {
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 10,
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticatedOrReadOnly',
+    ],
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ],
+    'DEFAULT_FILTER_BACKENDS': [
+        'django_filters.rest_framework.DjangoFilterBackend',
+    ],
+}
 
 # Internationalization
 
@@ -95,8 +120,11 @@ USE_L10N = True
 
 USE_TZ = True
 
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(days=1),
+    'AUTH_HEADER_TYPES': ('Bearer',),
+}
 
-# Static files (CSS, JavaScript, Images)
 
 STATIC_URL = '/static/'
 
