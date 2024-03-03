@@ -3,6 +3,7 @@ from django.utils import timezone
 from rest_framework import serializers
 
 from reviews.models import Category, Comment, Genre, Review, Title, User
+from .constants import CHECK_AT_EXISTING
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -119,13 +120,13 @@ class SignUpSerializer(serializers.ModelSerializer):
         )
 
     def validate_username(self, username):
-        if username == 'me':
+        if username == 'me' or username == 'Me':
             raise serializers.ValidationError('Username can not equal "me"!')
         return username
 
     def validate_email(self, email):
         mail = email.split('@')
-        if len(mail) != 2:
+        if len(mail) != CHECK_AT_EXISTING:
             raise serializers.ValidationError('Email must have "@"!')
         return email
 
@@ -150,7 +151,7 @@ class ReviewSerializer(serializers.ModelSerializer):
         default=serializers.CurrentUserDefault())
 
     class Meta:
-        fields = '__all__'
+        fields = ('id', 'title', 'text', 'author', 'score', 'pub_date')
         model = Review
         read_only_fields = ['title']
 

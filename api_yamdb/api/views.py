@@ -94,10 +94,6 @@ class TitlesViewSet(viewsets.ModelViewSet):
         return TitleSerializer
 
     def partial_update(self, request, *args, **kwargs):
-        name = request.data.get('name')
-        if name and len(name) > 256:
-            raise ValidationError(
-                'Название произведения не может быть длиннее 256 символов.')
         instance = self.get_object()
         serializer = self.get_serializer(
             instance, data=request.data, partial=True)

@@ -1,4 +1,5 @@
 import csv
+import logging
 
 from django.conf import settings
 from django.core.management import BaseCommand
@@ -19,6 +20,7 @@ DATA_NAMES = {
 
 class Command(BaseCommand):
     def handle(self, *args, **kwargs):
+        logger = logging.getLogger(__name__)
         for model, csv_filename in DATA_NAMES.items():
             with open(f'{settings.BASE_DIR}/static/data/{csv_filename}',
                       'r',
@@ -26,4 +28,4 @@ class Command(BaseCommand):
                 reader = csv.DictReader(csv_file)
                 model.objects.bulk_create(
                     model(**data) for data in reader)
-                print('Данные из csv-файла были успешно загружены')
+                logger.info('Данные из csv-файла были успешно загружены')
