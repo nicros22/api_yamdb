@@ -22,8 +22,9 @@ from .permissions import (AuthorOrAdmin, IsAdminOrReadOnly,
                           IsOwnerOrModeratorOrReadOnly)
 from .serializers import (CategorySerializer, CommentSerializer,
                           ConfirmationSerializer, GenreSerializer,
-                          MeSerializer, ReviewSerializer, SignUpSerializer,
+                          ReviewSerializer, SignUpSerializer,
                           TitleSerializer, TitleViewSerializer, UserSerializer)
+from api_yamdb.settings import DEFAULT_FROM_EMAIL
 
 
 class UserViewSet(viewsets.ModelViewSet):
@@ -34,10 +35,8 @@ class UserViewSet(viewsets.ModelViewSet):
     filter_backends = (SearchFilter,)
     lookup_field = 'username'
     filterset_fields = ('username')
-    search_fields = ('username', )
-
-    def update(self, request, *args, **kwargs):
-        raise MethodNotAllowed('PUT')
+    search_fields = ('username',)
+    http_method_names = ['get', 'post', 'patch', 'delete']
 
     @action(
         detail=False,
@@ -48,22 +47,15 @@ class UserViewSet(viewsets.ModelViewSet):
     def about_me(self, request):
         user = get_object_or_404(User, username=self.request.user)
         if request.method == 'GET':
-            serializer = MeSerializer(user)
+            serializer = UserSerializer(user)
             return Response(serializer.data, status=status.HTTP_200_OK)
-        if request.method == 'PATCH':
-            serializer = MeSerializer(
+        else:
+            serializer = UserSerializer(
                 user, data=request.data, partial=True
             )
             serializer.is_valid(raise_exception=True)
-            serializer.save()
+            serializer.save(role=self.request.user.role)
             return Response(serializer.data, status=status.HTTP_200_OK)
-
-    def partial_update(self, request, *args, **kwargs):
-        user = self.get_object()
-        serializer = self.get_serializer(user, data=request.data, partial=True)
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
-        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class GenresViewSet(ReviewsModelMixin):
@@ -117,13 +109,15 @@ class ReviewViewSet(viewsets.ModelViewSet):
     serializer_class = ReviewSerializer
     permission_classes = [IsOwnerOrModeratorOrReadOnly]
 
+    def get_title(self):
+        return get_object_or_404(Title, id=self.kwargs.get('title_id'))
+
     def get_queryset(self):
-        title = get_object_or_404(Title, id=self.kwargs.get('title_id'))
-        new_queryset = title.reviews.all()
-        return new_queryset
+        title = self.get_title()
+        return title.reviews.all()
 
     def perform_create(self, serializer):
-        title = get_object_or_404(Title, id=self.kwargs.get('title_id'))
+        title = self.get_title()
         serializer.save(author=self.request.user, title=title)
 
     def update(self, request, *args, **kwargs):
@@ -144,21 +138,21 @@ class CommentViewSet(viewsets.ModelViewSet):
     serializer_class = CommentSerializer
     permission_classes = [IsOwnerOrModeratorOrReadOnly]
 
-    def get_queryset(self):
+    def get_review(self):
         title = get_object_or_404(Title, id=self.kwargs.get('title_id'))
         try:
             review = title.reviews.get(id=self.kwargs.get('review_id'))
         except TypeError:
             TypeError('У произведения нет такого отзыва')
-        queryset = review.comments.all().order_by('pk')
+        return review
+
+    def get_queryset(self):
+        title = self.get_review()
+        queryset = title.comments.all().order_by('pk')
         return queryset
 
     def perform_create(self, serializer):
-        title = get_object_or_404(Title, id=self.kwargs.get('title_id'))
-        try:
-            review = title.reviews.get(id=self.kwargs.get('review_id'))
-        except TypeError:
-            TypeError('У произведения нет такого отзыва')
+        review = self.get_review()
         serializer.save(author=self.request.user, review=review)
 
     def update(self, request, *args, **kwargs):
@@ -179,7 +173,7 @@ class AuthenticationViewset(viewsets.GenericViewSet):
     def send_confirmation_email(self, email, confirmation_code):
         subject = 'Confirmation Code for YourApp'
         message = f'Your confirmation code is: {confirmation_code}'
-        from_email = 'yamdb@yamdb.com'
+        from_email = DEFAULT_FROM_EMAIL
         recipient_list = [email]
         send_mail(subject, message, from_email, recipient_list)
 

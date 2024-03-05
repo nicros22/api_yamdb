@@ -7,20 +7,6 @@ from .constants import CHECK_AT_EXISTING
 
 
 class UserSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = User
-        fields = (
-            'first_name',
-            'last_name',
-            'username',
-            'bio',
-            'email',
-            'role',
-        )
-
-
-class MeSerializer(serializers.ModelSerializer):
-    role = serializers.CharField(read_only=True)
 
     class Meta:
         model = User
@@ -61,6 +47,8 @@ class TitleSerializer(serializers.ModelSerializer):
         queryset=Genre.objects.all(),
         many=True,
         required=False,
+        allow_empty=True,
+        default=[],
     )
 
     class Meta:
