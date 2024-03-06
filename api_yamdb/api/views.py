@@ -1,52 +1,42 @@
-from sys import stderr
 import secrets
-from django.core.mail import send_mail
-from rest_framework import status, viewsets
-from rest_framework.generics import get_object_or_404
-from rest_framework.permissions import AllowAny, IsAuthenticated
-from rest_framework.filters import SearchFilter
-from rest_framework.response import Response
-from rest_framework.decorators import action
-from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework.pagination import PageNumberPagination
-from rest_framework_simplejwt import tokens
-from loguru import logger
+
 from django.contrib.auth.hashers import check_password
+from django.core.exceptions import ValidationError
+from django.core.mail import send_mail
+from django.db.models import Avg
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework import status, viewsets
+from rest_framework.decorators import action
 from rest_framework.exceptions import MethodNotAllowed
+from rest_framework.filters import SearchFilter
+from rest_framework.generics import get_object_or_404
+from rest_framework.pagination import PageNumberPagination
+from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.response import Response
+from rest_framework_simplejwt import tokens
+from reviews.models import Category, Genre, Title, User
 
-from .mixins import ReviewsModelMixin
-from .serializers import (UserSerializer,
-                          MeSerializer,
-                          GenreSerializer,
-                          CategorySerializer,
-                          TitleSerializer,
-                          TitleViewSerializer,
-                          SignUpSerializer,
-                          ConfirmationSerializer,
-                          CommentSerializer,
-                          ReviewSerializer)
-
-from reviews.models import Category, Genre, Title, User, Review
-from .permissions import (IsAdminOrReadOnly,
-                          IsOwnerOrModeratorOrReadOnly,
-                          AuthorOrAdmin)
 from .filters import TitleFilter
-
-logger.add(stderr, format='<white>{time:HH:mm:ss}</white>'
-                          ' | <level>{level: <8}</level>'
-                          ' | <cyan>{line}</cyan>'
-                          ' - <white>{message}</white>')
+from .mixins import ReviewsModelMixin
+from .permissions import (AuthorOrAdmin, IsAdminOrReadOnly,
+                          IsOwnerOrModeratorOrReadOnly)
+from .serializers import (CategorySerializer, CommentSerializer,
+                          ConfirmationSerializer, GenreSerializer,
+                          ReviewSerializer, SignUpSerializer,
+                          TitleSerializer, TitleViewSerializer, UserSerializer)
+from api_yamdb.settings import DEFAULT_FROM_EMAIL
 
 
 class UserViewSet(viewsets.ModelViewSet):
-    queryset = User.objects.all()
+    queryset = User.objects.all().order_by('pk')
     serializer_class = UserSerializer
     pagination_class = PageNumberPagination
     permission_classes = (AuthorOrAdmin,)
+    filter_backends = (SearchFilter,)
     lookup_field = 'username'
-    filter_backends = (SearchFilter, )
-    filterset_fields = ('username', )
-    search_fields = ('username', )
+    filterset_fields = ('username')
+    search_fields = ('username',)
+    http_method_names = ['get', 'post', 'patch', 'delete']
 
     @action(
         detail=False,
@@ -57,85 +47,133 @@ class UserViewSet(viewsets.ModelViewSet):
     def about_me(self, request):
         user = get_object_or_404(User, username=self.request.user)
         if request.method == 'GET':
-            serializer = MeSerializer(user)
+            serializer = UserSerializer(user)
             return Response(serializer.data, status=status.HTTP_200_OK)
-        if request.method == 'PATCH':
-            serializer = MeSerializer(
+        else:
+            serializer = UserSerializer(
                 user, data=request.data, partial=True
             )
             serializer.is_valid(raise_exception=True)
-            serializer.save()
+            serializer.save(role=self.request.user.role)
             return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class GenresViewSet(ReviewsModelMixin):
-    queryset = Genre.objects.all()
+    queryset = Genre.objects.all().order_by('pk')
     serializer_class = GenreSerializer
 
 
 class CategoriesViewSet(ReviewsModelMixin):
-    queryset = Category.objects.all()
+    queryset = Category.objects.all().order_by('pk')
     serializer_class = CategorySerializer
 
 
 class TitlesViewSet(viewsets.ModelViewSet):
-    queryset = Title.objects.all()
+    queryset = Title.objects.annotate(
+        rating=Avg('reviews__score')).order_by('pk')
     serializer_class = TitleSerializer
     permission_classes = (IsAdminOrReadOnly,)
     filter_backends = (DjangoFilterBackend,)
     filterset_class = TitleFilter
     pagination_class = PageNumberPagination
 
+    def update(self, request, *args, **kwargs):
+        raise MethodNotAllowed(request.method)
+
     def get_serializer_class(self):
-        if self.request.method in ('list', 'retrieve',):
+        if self.action in ('list', 'retrieve',):
             return TitleViewSerializer
         return TitleSerializer
+
+    def partial_update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(
+            instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
+
+    def handle_exception(self, exc):
+        if isinstance(exc, MethodNotAllowed):
+            return Response(
+                {'detail': 'Метод не разрешен'},
+                status=status.HTTP_405_METHOD_NOT_ALLOWED)
+        if isinstance(exc, ValidationError):
+            return Response(
+                {'detail': str(exc)},
+                status=status.HTTP_400_BAD_REQUEST)
+        return super().handle_exception(exc)
 
 
 class ReviewViewSet(viewsets.ModelViewSet):
     serializer_class = ReviewSerializer
-    permission_classes = (IsOwnerOrModeratorOrReadOnly, )
+    permission_classes = [IsOwnerOrModeratorOrReadOnly]
 
     def get_title(self):
-        title_id = self.kwargs.get('title_id')
-        return get_object_or_404(Title, id=title_id)
+        return get_object_or_404(Title, id=self.kwargs.get('title_id'))
 
     def get_queryset(self):
-        return self.get_title().reviews.all()
+        title = self.get_title()
+        return title.reviews.all()
 
     def perform_create(self, serializer):
         title = self.get_title()
-        serializer.save(user=self.request.user, title=title)
-        review = serializer.instance
-        review.title.average_rating()
+        serializer.save(author=self.request.user, title=title)
 
-    def perform_update(self, serializer):
-        review = serializer.save()
-        review.title.average_rating()
+    def update(self, request, *args, **kwargs):
+        return Response(
+            {'detail': 'Метод не разрешен'},
+            status=status.HTTP_405_METHOD_NOT_ALLOWED)
+
+    def partial_update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(
+            instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
 
 
 class CommentViewSet(viewsets.ModelViewSet):
     serializer_class = CommentSerializer
-    permission_classes = (IsOwnerOrModeratorOrReadOnly, )
+    permission_classes = [IsOwnerOrModeratorOrReadOnly]
 
     def get_review(self):
-        title_id = self.kwargs['title_id']
-        review_id = self.kwargs['review_id']
-        return get_object_or_404(Review, id=review_id, title__id=title_id)
+        title = get_object_or_404(Title, id=self.kwargs.get('title_id'))
+        try:
+            review = title.reviews.get(id=self.kwargs.get('review_id'))
+        except TypeError:
+            TypeError('У произведения нет такого отзыва')
+        return review
 
     def get_queryset(self):
-        return self.get_review().comments.all()
+        title = self.get_review()
+        queryset = title.comments.all().order_by('pk')
+        return queryset
 
     def perform_create(self, serializer):
         review = self.get_review()
         serializer.save(author=self.request.user, review=review)
+
+    def update(self, request, *args, **kwargs):
+        return Response(
+            {'detail': 'Метод не разрешен'},
+            status=status.HTTP_405_METHOD_NOT_ALLOWED)
+
+    def partial_update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(
+            instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
 
 
 class AuthenticationViewset(viewsets.GenericViewSet):
     def send_confirmation_email(self, email, confirmation_code):
         subject = 'Confirmation Code for YourApp'
         message = f'Your confirmation code is: {confirmation_code}'
-        from_email = 'yamdb@yamdb.com'
+        from_email = DEFAULT_FROM_EMAIL
         recipient_list = [email]
         send_mail(subject, message, from_email, recipient_list)
 
@@ -159,12 +197,12 @@ class AuthenticationViewset(viewsets.GenericViewSet):
             confirmation_code = secrets.token_hex(6)
             if not existing_user:
                 return Response(
-                    {'email': [email,]},
+                    {'email': [email, ]},
                     status=status.HTTP_400_BAD_REQUEST
                 )
             if not existing_mail:
                 return Response(
-                    {'username': [existing_user.username,]},
+                    {'username': [existing_user.username, ]},
                     status=status.HTTP_400_BAD_REQUEST
                 )
             if email == existing_user.email:
@@ -180,8 +218,8 @@ class AuthenticationViewset(viewsets.GenericViewSet):
                 }, status=status.HTTP_200_OK)
             else:
                 return Response(
-                    {'email': [email,],
-                     'username': [existing_user.username,]},
+                    {'email': [email, ],
+                     'username': [existing_user.username, ]},
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
