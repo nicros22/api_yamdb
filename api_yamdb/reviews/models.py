@@ -100,6 +100,10 @@ class User(AbstractUser):
     def is_admin(self):
         return self.role == 'admin'
 
+    def clean(self):
+        if self.username.lower() == 'me':
+            raise ValidationError('Username "me" is not allowed.')
+
 
 class Review(models.Model):
     """Модель для отзывов."""

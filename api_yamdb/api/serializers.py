@@ -39,6 +39,7 @@ class CategorySerializer(serializers.ModelSerializer):
 
 
 class TitleSerializer(serializers.ModelSerializer):
+
     category = serializers.SlugRelatedField(
         slug_field='slug', queryset=Category.objects.all(), many=False,
     )
@@ -50,6 +51,7 @@ class TitleSerializer(serializers.ModelSerializer):
         allow_empty=True,
         default=[],
     )
+    year = serializers.IntegerField()
 
     class Meta:
         model = Title
@@ -65,11 +67,15 @@ class TitleSerializer(serializers.ModelSerializer):
             )
         return value
 
+    def to_representation(self, instance):
+        serializer = TitleViewSerializer(instance)
+        return serializer.data
+
 
 class TitleViewSerializer(serializers.ModelSerializer):
     category = CategorySerializer(many=False, required=True)
     genre = GenreSerializer(many=True, required=False)
-    rating = serializers.SerializerMethodField()
+    rating = serializers.FloatField(read_only=True, default=0)
 
     class Meta:
         model = Title

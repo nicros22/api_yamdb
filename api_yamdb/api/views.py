@@ -223,29 +223,27 @@ class AuthenticationViewset(viewsets.GenericViewSet):
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
-        if serializer.is_valid():
-            confirmation_code = secrets.token_hex(6)
-            username = serializer.validated_data.get('username')
-            email = serializer.validated_data.get('email')
+        serializer.is_valid(raise_exception=True)
+        confirmation_code = secrets.token_hex(6)
+        username = serializer.validated_data.get('username')
+        email = serializer.validated_data.get('email')
 
-            user = User.objects.create(username=username, email=email)
-            user.set_password(confirmation_code)
-            user.save()
+        user = User.objects.create(username=username, email=email)
+        user.set_password(confirmation_code)
+        user.save()
 
-            self.send_confirmation_email(user.email, confirmation_code)
+        self.send_confirmation_email(user.email, confirmation_code)
 
-            return Response(
-                serializer.validated_data,
-                status=status.HTTP_200_OK
-            )
-
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        return Response(
+            serializer.validated_data,
+            status=status.HTTP_200_OK
+        )
 
     @action(
         methods=['POST'],
         detail=False,
         url_path='token',
-        url_name='toekn',
+        url_name='token',
         permission_classes=(AllowAny,)
     )
     def get_token(self, request):
