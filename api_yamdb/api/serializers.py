@@ -1,4 +1,3 @@
-from django.db.models import Avg
 from django.utils import timezone
 from rest_framework import serializers
 
@@ -49,7 +48,7 @@ class TitleSerializer(serializers.ModelSerializer):
         many=True,
         required=False,
         allow_empty=True,
-        default=[],
+        allow_null=False
     )
     year = serializers.IntegerField()
 
@@ -75,7 +74,7 @@ class TitleSerializer(serializers.ModelSerializer):
 class TitleViewSerializer(serializers.ModelSerializer):
     category = CategorySerializer(many=False, required=True)
     genre = GenreSerializer(many=True, required=False)
-    rating = serializers.FloatField(read_only=True, default=0)
+    rating = serializers.IntegerField(read_only=True, default=0)
 
     class Meta:
         model = Title
@@ -97,12 +96,6 @@ class TitleViewSerializer(serializers.ModelSerializer):
             'genre',
             'category',
         )
-
-    def get_rating(self, obj):
-        rating = obj.reviews.aggregate(Avg('score')).get('score__avg')
-        if not rating:
-            return rating
-        return round(rating, 1)
 
 
 class SignUpSerializer(serializers.ModelSerializer):

@@ -1,11 +1,11 @@
 from django.contrib.auth.models import AbstractUser
-from django.core.validators import MaxValueValidator, MinValueValidator
 from django.core.exceptions import ValidationError
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
-from .abstract import BaseModel
-from django.utils import timezone
 
-from .constants import MAX_LENGTH_MODEL, MAX_LENGTH_EMAIL
+from .abstract import BaseModel
+from .constants import MAX_LENGTH_EMAIL, MAX_LENGTH_MODEL
+from .validators import year_validator
 
 ROLE_CHOICES = (
     ('user', 'Пользователь'),
@@ -17,18 +17,21 @@ ROLE_CHOICES = (
 class Category(BaseModel):
     """Базовая модель категорий."""
 
+    class Meta(BaseModel.Meta):
+        verbose_name = 'Категория'
+        verbose_name_plural = 'Категории'
+
 
 class Genre(BaseModel):
     """Базовая модель жанров."""
 
+    class Meta(BaseModel.Meta):
+        verbose_name = 'Жанр'
+        verbose_name_plural = 'Жанры'
+
 
 class Title(models.Model):
     """Базовая модель произведений."""
-
-    def year_validator(value):
-        if value > timezone.now().year:
-            raise ValidationError('Год не может быть будущим.')
-
     name = models.CharField(
         max_length=MAX_LENGTH_MODEL,
         verbose_name='Название',
